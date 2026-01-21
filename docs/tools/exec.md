@@ -39,7 +39,7 @@ Notes:
 
 - `tools.exec.notifyOnExit` (default: true): when true, backgrounded exec sessions enqueue a system event and request a heartbeat on exit.
 - `tools.exec.host` (default: `sandbox`)
-- `tools.exec.security` (default: `deny`)
+- `tools.exec.security` (default: `deny` for sandbox, `allowlist` for gateway + node when unset)
 - `tools.exec.ask` (default: `on-miss`)
 - `tools.exec.node` (default: unset)
 - `tools.exec.pathPrepend`: list of directories to prepend to `PATH` for exec runs.
@@ -57,7 +57,8 @@ Example:
 
 ### PATH handling
 
-- `host=gateway`: uses the Gateway process `PATH`. Daemons install a minimal `PATH`:
+- `host=gateway`: merges your login-shell `PATH` into the exec environment (unless the exec call
+  already sets `env.PATH`). The daemon itself still runs with a minimal `PATH`:
   - macOS: `/opt/homebrew/bin`, `/usr/local/bin`, `/usr/bin`, `/bin`
   - Linux: `/usr/local/bin`, `/usr/bin`, `/bin`
 - `host=sandbox`: runs `sh -lc` (login shell) inside the container, so `/etc/profile` may reset `PATH`.

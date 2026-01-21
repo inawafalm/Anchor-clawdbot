@@ -1,6 +1,5 @@
 import type { ReasoningLevel, ThinkLevel } from "../auto-reply/thinking.js";
 import { SILENT_REPLY_TOKEN } from "../auto-reply/tokens.js";
-import { formatCliCommand } from "../cli/command-format.js";
 import { listDeliverableMessageChannels } from "../utils/message-channel.js";
 import type { ResolvedTimeFormat } from "./date-time.js";
 import type { EmbeddedContextFile } from "./pi-embedded-helpers.js";
@@ -125,7 +124,7 @@ function buildDocsSection(params: { docsPath?: string; isMinimal: boolean; readT
     "Community: https://discord.com/invite/clawd",
     "Find new skills: https://clawdhub.com",
     "For Clawdbot behavior, commands, config, or architecture: consult local docs first.",
-    `When diagnosing issues, run \`${formatCliCommand("clawdbot status")}\` yourself when possible; only ask the user if you lack access (e.g., sandboxed).`,
+    "When diagnosing issues, run `clawdbot status` yourself when possible; only ask the user if you lack access (e.g., sandboxed).",
     "",
   ];
 }
@@ -156,6 +155,7 @@ export function buildAgentSystemPrompt(params: {
     arch?: string;
     node?: string;
     model?: string;
+    defaultModel?: string;
     channel?: string;
     capabilities?: string[];
   };
@@ -365,11 +365,11 @@ export function buildAgentSystemPrompt(params: {
     "## Clawdbot CLI Quick Reference",
     "Clawdbot is controlled via subcommands. Do not invent commands.",
     "To manage the Gateway daemon service (start/stop/restart):",
-    `- ${formatCliCommand("clawdbot daemon status")}`,
-    `- ${formatCliCommand("clawdbot daemon start")}`,
-    `- ${formatCliCommand("clawdbot daemon stop")}`,
-    `- ${formatCliCommand("clawdbot daemon restart")}`,
-    `If unsure, ask the user to run \`${formatCliCommand("clawdbot help")}\` (or \`${formatCliCommand("clawdbot daemon --help")}\`) and paste the output.`,
+    "- clawdbot gateway status",
+    "- clawdbot gateway start",
+    "- clawdbot gateway stop",
+    "- clawdbot gateway restart",
+    "If unsure, ask the user to run `clawdbot help` (or `clawdbot gateway --help`) and paste the output.",
     "",
     ...skillsSection,
     ...memorySection,
@@ -565,6 +565,7 @@ export function buildRuntimeLine(
     arch?: string;
     node?: string;
     model?: string;
+    defaultModel?: string;
   },
   runtimeChannel?: string,
   runtimeCapabilities: string[] = [],
@@ -580,6 +581,7 @@ export function buildRuntimeLine(
         : "",
     runtimeInfo?.node ? `node=${runtimeInfo.node}` : "",
     runtimeInfo?.model ? `model=${runtimeInfo.model}` : "",
+    runtimeInfo?.defaultModel ? `default_model=${runtimeInfo.defaultModel}` : "",
     runtimeChannel ? `channel=${runtimeChannel}` : "",
     runtimeChannel
       ? `capabilities=${runtimeCapabilities.length > 0 ? runtimeCapabilities.join(",") : "none"}`

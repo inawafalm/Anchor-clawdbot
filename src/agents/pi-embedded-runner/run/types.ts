@@ -21,6 +21,8 @@ export type EmbeddedRunAttemptParams = {
   messageChannel?: string;
   messageProvider?: string;
   agentAccountId?: string;
+  messageTo?: string;
+  messageThreadId?: string | number;
   currentChannelId?: string;
   currentThreadTs?: string;
   replyToMode?: "off" | "first" | "all";
@@ -56,6 +58,9 @@ export type EmbeddedRunAttemptParams = {
     text?: string;
     mediaUrls?: string[];
     audioAsVoice?: boolean;
+    replyToId?: string;
+    replyToTag?: boolean;
+    replyToCurrent?: boolean;
   }) => void | Promise<void>;
   onBlockReplyFlush?: () => void | Promise<void>;
   blockReplyBreak?: "text_end" | "message_end";

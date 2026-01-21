@@ -1,6 +1,14 @@
 import type { ClawdbotConfig } from "./config.js";
+import {
+  getChatChannelMeta,
+  listChatChannels,
+  normalizeChatChannelId,
+} from "../channels/registry.js";
+import {
+  getChannelPluginCatalogEntry,
+  listChannelPluginCatalogEntries,
+} from "../channels/plugins/catalog.js";
 import { normalizeProviderId } from "../agents/model-selection.js";
-import { listChatChannels } from "../channels/registry.js";
 import { hasAnyWhatsAppAuth } from "../web/accounts.js";
 
 type PluginEnableChange = {
@@ -12,6 +20,13 @@ export type PluginAutoEnableResult = {
   config: ClawdbotConfig;
   changes: string[];
 };
+
+const CHANNEL_PLUGIN_IDS = Array.from(
+  new Set([
+    ...listChatChannels().map((meta) => meta.id),
+    ...listChannelPluginCatalogEntries().map((entry) => entry.id),
+  ]),
+);
 
 const PROVIDER_PLUGIN_IDS: Array<{ pluginId: string; providerId: string }> = [
   { pluginId: "google-antigravity-auth", providerId: "google-antigravity" },
@@ -226,10 +241,7 @@ function resolveConfiguredPlugins(
   env: NodeJS.ProcessEnv,
 ): PluginEnableChange[] {
   const changes: PluginEnableChange[] = [];
-  const channelIds = new Set<string>();
-  for (const meta of listChatChannels()) {
-    channelIds.add(meta.id);
-  }
+  const channelIds = new Set(CHANNEL_PLUGIN_IDS);
   const configuredChannels = cfg.channels as Record<string, unknown> | undefined;
   if (configuredChannels && typeof configuredChannels === "object") {
     for (const key of Object.keys(configuredChannels)) {
@@ -267,6 +279,32 @@ function isPluginDenied(cfg: ClawdbotConfig, pluginId: string): boolean {
   return Array.isArray(deny) && deny.includes(pluginId);
 }
 
+function resolvePreferredOverIds(pluginId: string): string[] {
+  const normalized = normalizeChatChannelId(pluginId);
+  if (normalized) {
+    return getChatChannelMeta(normalized).preferOver ?? [];
+  }
+  const catalogEntry = getChannelPluginCatalogEntry(pluginId);
+  return catalogEntry?.meta.preferOver ?? [];
+}
+
+function shouldSkipPreferredPluginAutoEnable(
+  cfg: ClawdbotConfig,
+  entry: PluginEnableChange,
+  configured: PluginEnableChange[],
+): boolean {
+  for (const other of configured) {
+    if (other.pluginId === entry.pluginId) continue;
+    if (isPluginDenied(cfg, other.pluginId)) continue;
+    if (isPluginExplicitlyDisabled(cfg, other.pluginId)) continue;
+    const preferOver = resolvePreferredOverIds(other.pluginId);
+    if (preferOver.includes(entry.pluginId)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function ensureAllowlisted(cfg: ClawdbotConfig, pluginId: string): ClawdbotConfig {
   const allow = cfg.plugins?.allow;
   if (!Array.isArray(allow) || allow.includes(pluginId)) return cfg;
@@ -297,6 +335,16 @@ function enablePluginEntry(cfg: ClawdbotConfig, pluginId: string): ClawdbotConfi
   };
 }
 
+function formatAutoEnableChange(entry: PluginEnableChange): string {
+  let reason = entry.reason.trim();
+  const channelId = normalizeChatChannelId(entry.pluginId);
+  if (channelId) {
+    const label = getChatChannelMeta(channelId).label;
+    reason = reason.replace(new RegExp(`^${channelId}\\b`, "i"), label);
+  }
+  return `${reason}, not enabled yet.`;
+}
+
 export function applyPluginAutoEnable(params: {
   config: ClawdbotConfig;
   env?: NodeJS.ProcessEnv;
@@ -317,13 +365,14 @@ export function applyPluginAutoEnable(params: {
   for (const entry of configured) {
     if (isPluginDenied(next, entry.pluginId)) continue;
     if (isPluginExplicitlyDisabled(next, entry.pluginId)) continue;
+    if (shouldSkipPreferredPluginAutoEnable(next, entry, configured)) continue;
     const allow = next.plugins?.allow;
     const allowMissing = Array.isArray(allow) && !allow.includes(entry.pluginId);
     const alreadyEnabled = next.plugins?.entries?.[entry.pluginId]?.enabled === true;
     if (alreadyEnabled && !allowMissing) continue;
     next = enablePluginEntry(next, entry.pluginId);
     next = ensureAllowlisted(next, entry.pluginId);
-    changes.push(`Enabled plugin "${entry.pluginId}" (${entry.reason}).`);
+    changes.push(formatAutoEnableChange(entry));
   }
 
   return { config: next, changes };

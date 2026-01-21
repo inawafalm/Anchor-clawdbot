@@ -210,6 +210,8 @@ export async function runAgentTurnWithFallback(params: {
             sessionKey: params.sessionKey,
             messageProvider: params.sessionCtx.Provider?.trim().toLowerCase() || undefined,
             agentAccountId: params.sessionCtx.AccountId,
+            messageTo: params.sessionCtx.OriginatingTo ?? params.sessionCtx.To,
+            messageThreadId: params.sessionCtx.MessageThreadId ?? undefined,
             // Provider threading context for tool auto-injection
             ...buildThreadingToolContext({
               sessionCtx: params.sessionCtx,
@@ -297,18 +299,23 @@ export async function runAgentTurnWithFallback(params: {
                   const { text, skip } = normalizeStreamingText(payload);
                   const hasPayloadMedia = (payload.mediaUrls?.length ?? 0) > 0;
                   if (skip && !hasPayloadMedia) return;
+                  const currentMessageId =
+                    params.sessionCtx.MessageSidFull ?? params.sessionCtx.MessageSid;
                   const taggedPayload = applyReplyTagsToPayload(
                     {
                       text,
                       mediaUrls: payload.mediaUrls,
                       mediaUrl: payload.mediaUrls?.[0],
+                      replyToId: payload.replyToId,
+                      replyToTag: payload.replyToTag,
+                      replyToCurrent: payload.replyToCurrent,
                     },
-                    params.sessionCtx.MessageSid,
+                    currentMessageId,
                   );
                   // Let through payloads with audioAsVoice flag even if empty (need to track it)
                   if (!isRenderablePayload(taggedPayload) && !payload.audioAsVoice) return;
                   const parsed = parseReplyDirectives(taggedPayload.text ?? "", {
-                    currentMessageId: params.sessionCtx.MessageSid,
+                    currentMessageId,
                     silentToken: SILENT_REPLY_TOKEN,
                   });
                   const cleaned = parsed.text || undefined;
